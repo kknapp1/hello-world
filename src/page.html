@@ -1,0 +1,182 @@
+<title>Hello from Earth</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Hello! The Earth right now, lit by the real sun and centered on you.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: the globe fills the screen as a live canvas; text floats over it, greeting top-left, instruments along the bottom. */
+  :root {
+    --space: #03050b;          /* deep sky behind the globe */
+    --ink: #eef2fb;            /* primary text, cool white */
+    --ink-dim: #8d97ad;        /* labels and notes, blue-grey */
+    --sun: #ffd27a;            /* sunlight: accent, marker, live dot */
+    --haze: #5d9bff;           /* atmosphere blue for focus and hover */
+    --glass: rgba(10, 14, 26, 0.55);
+    --line: rgba(160, 180, 220, 0.16);
+    --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    color-scheme: dark;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--space);
+    color: var(--ink);
+    font-family: var(--mono);
+    overflow: hidden;
+  }
+  #globe {
+    position: fixed; inset: 0;
+    width: 100%; height: 100%;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+    opacity: 0;
+    transition: opacity 1.6s ease;
+  }
+  #globe:active { cursor: grabbing; }
+  body.ready #globe { opacity: 1; }
+
+  .hud {
+    position: fixed; inset: 0;
+    pointer-events: none;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+    padding-block: max(28px, env(safe-area-inset-top, 0px)) max(22px, env(safe-area-inset-bottom, 0px));
+  }
+  .hud > * { pointer-events: auto; }
+
+  header { max-width: 34rem; }
+  h1 {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: clamp(4rem, 13vw, 10.5rem);
+    line-height: 0.9;
+    letter-spacing: -0.04em;
+    margin: 0 0 0.25em -0.04em;
+    background: linear-gradient(100deg, var(--ink) 30%, var(--sun) 120%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+    animation: rise 1.2s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .lede {
+    font-family: var(--display);
+    font-weight: 300;
+    font-size: clamp(1rem, 2.1vw, 1.35rem);
+    line-height: 1.4;
+    margin: 0;
+    max-width: 26ch;
+    text-wrap: balance;
+    animation: rise 1.2s 0.15s cubic-bezier(.2,.7,.2,1) both;
+  }
+  .lede em { font-style: normal; color: var(--sun); }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+
+  footer {
+    display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+    gap: 16px 32px;
+  }
+  .readouts {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, auto));
+    gap: 14px 32px;
+    font-size: 0.78rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .ro { display: grid; gap: 3px; min-width: 0; }
+  .ro dt {
+    font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--ink-dim);
+    display: flex; align-items: center; gap: 7px;
+  }
+  .ro dd { margin: 0; font-size: 0.95rem; font-weight: 500; white-space: nowrap; }
+  .ro dd.note { font-size: 0.7rem; color: var(--ink-dim); white-space: nowrap; }
+  .live { width: 6px; height: 6px; border-radius: 50%; background: var(--sun); box-shadow: 0 0 8px var(--sun); animation: blink 2s infinite; }
+  body.ff .live { background: var(--haze); box-shadow: 0 0 8px var(--haze); }
+  @keyframes blink { 50% { opacity: 0.35; } }
+
+  .actions { display: grid; gap: 8px; justify-items: end; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  button {
+    font: 500 0.78rem/1 var(--mono);
+    color: var(--ink);
+    background: var(--glass);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 10px 16px;
+    cursor: pointer;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    transition: border-color .2s, color .2s;
+  }
+  button:hover { border-color: var(--haze); }
+  button:focus-visible { outline: 2px solid var(--haze); outline-offset: 2px; }
+  button[aria-pressed="true"] { color: var(--sun); border-color: var(--sun); }
+  button:disabled { opacity: 0.6; cursor: progress; }
+  #loc-msg { font-size: 0.7rem; color: var(--ink-dim); max-width: 34ch; text-align: right; margin: 0; min-height: 1em; }
+  .hint { font-size: 0.68rem; color: var(--ink-dim); letter-spacing: 0.04em; transition: opacity .6s; }
+  body.touched .hint { opacity: 0; }
+  .credit { font-size: 0.62rem; color: var(--ink-dim); opacity: 0.75; margin: 0; }
+
+  @media (max-width: 720px) {
+    .hud { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: max(20px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-bottom, 0px)); }
+    .readouts { grid-template-columns: repeat(2, minmax(0, auto)); gap: 10px 20px; }
+    .ro.alt { display: none; }
+    footer { flex-direction: column; align-items: stretch; }
+    .actions { justify-items: start; }
+    .btns { justify-content: flex-start; }
+    #loc-msg { text-align: left; }
+    .hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    h1, .lede, .live { animation: none; }
+    #globe { transition: none; }
+  }
+</style>
+
+<canvas id="globe" aria-label="A 3D globe of the Earth lit by the sun as it is right now. Drag to spin it."></canvas>
+
+<div class="hud">
+  <header>
+    <h1>Hello!</h1>
+    <p class="lede"><span id="greet">Hello.</span> This is Earth <em>right now</em>, lit by the real sun.</p>
+  </header>
+
+  <footer>
+    <dl class="readouts">
+      <div class="ro">
+        <dt><span class="live" aria-hidden="true"></span>Your time</dt>
+        <dd id="r-time">--:--</dd>
+        <dd class="note" id="r-date"></dd>
+      </div>
+      <div class="ro">
+        <dt>You are here</dt>
+        <dd id="r-here">--</dd>
+        <dd class="note" id="r-here-note">Estimated from your time zone</dd>
+      </div>
+      <div class="ro">
+        <dt>Sun overhead at</dt>
+        <dd id="r-sun">--</dd>
+        <dd class="note">The subsolar point</dd>
+      </div>
+      <div class="ro alt">
+        <dt>Your sun</dt>
+        <dd id="r-alt">--</dd>
+        <dd class="note" id="r-alt-note"></dd>
+      </div>
+    </dl>
+
+    <div class="actions">
+      <p id="loc-msg" role="status"></p>
+      <div class="btns">
+        <button id="btn-ff" type="button" aria-pressed="false">Fast-forward the day</button>
+        <button id="btn-locate" type="button">Use my location</button>
+      </div>
+      <span class="hint">Drag to spin · scroll or pinch to zoom</span>
+      <p class="credit">Imagery: NASA Blue Marble and Black Marble · rendered with three.js</p>
+    </div>
+  </footer>
+</div>
+
+<script>/*BUNDLE*/</script>
